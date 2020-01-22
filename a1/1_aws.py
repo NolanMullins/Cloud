@@ -55,14 +55,18 @@ def listAllContainers(s3):
     except ClientError as e:
         print(e)
 
-def searchForFile(s3, fileName):
+def searchForFile(s3, fileName, download):
     try:
         fileName = fileName.lower()
         for bucket in s3.buckets.all():
             objects = s3.Bucket(bucket.name).objects.all()
             for obj in objects:
                 if (fileName in obj.key.lower()):
-                    print(obj.key+" in "+bucket.name)
+                    if (not download):
+                        print(obj.key+" in "+bucket.name)
+                    else:
+                        client = boto3.client('s3')
+                        client.download_file(bucket.name, obj.key, "./"+obj.key)
         print('')
     except ClientError as e:
         print(e)
@@ -88,10 +92,10 @@ if __name__ == "__main__":
                 print("Error no container\n")
                 continue
             showAllObjIn(s3, cmd[1])
-        elif (cmd[0] == "3"):
+        elif (cmd[0] == "3" or cmd[0] == "4"):
             if (len(cmd)==1):
                 print("Error no file\n")
                 continue
-            searchForFile(s3, cmd[1])
+            searchForFile(s3, cmd[1], cmd[0]=="4")
 
     print("Cleaning things up")
