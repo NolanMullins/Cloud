@@ -5,8 +5,8 @@ import boto3
 from botocore.exceptions import ClientError
 
 def uploadFile(client, bucketName, fileName):
-        f = open("data/"+fileName, 'rb')
-        client.put_object(Bucket=bucketName, Key=fileName, Body=f)
+    f = open("data/"+fileName, 'rb')
+    client.put_object(Bucket=bucketName, Key=fileName, Body=f)
 
 def init():
     try:
@@ -67,6 +67,7 @@ def searchForFile(s3, fileName, download):
                     else:
                         client = boto3.client('s3')
                         client.download_file(bucket.name, obj.key, "./"+obj.key)
+                        print('Downloaded: '+blob.name)
         print('')
     except ClientError as e:
         print(e)
