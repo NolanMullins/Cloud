@@ -3,6 +3,7 @@
 import time
 import string
 import json
+import csv
 import decimal
 import boto3
 
@@ -130,33 +131,49 @@ def getFilterAttribute():
     else:
         return -1
 
-sortKey = 'year'
-def sortHelper(e):
-    if (len(sortKey.split('.')) > 1):
-        keys = sortKey.split('.')
-        tmp = e
+def getVal(item, key):
+    if (len(key.split('.')) > 1):
+        keys = key.split('.')
+        tmp = item
         for key in keys:
             tmp = tmp[key]
         return tmp
     else:
-        print('single key')
-        return e[sortKey]
+        return item[key] 
+
+sortKey = 'year'
+def sortHelper(e):
+    return getVal(e, sortKey)
 
 def getDisplayAttributes():
-    attr = []
     txt = input('Leave blank to continue\nEnter attribute to display:\n')
+    attr = []
     while (not len(txt) == 0):
         attr.append(txt)
         txt = input('Leave blank to continue\nEnter attribute to display:\n')
     return attr
+
+def writeCsv(data, attr):
+    try:
+        outFile = open('query_'+str(int(time.time()))+'.csv', 'w')
+        with outFile:
+            writer = csv.writer(outFile)
+            writer.writerow(attr)
+            for item in data:
+                row = []
+                for key in attr:
+                    row.append(getVal(item, key))
+                writer.writerow(row)
+    except Exception as e:
+        print('Error writing file')
 
 def runScan(table, filter):
     global sortKey
     sortKey = input('Sort by: \n')
     if (len(sortKey)==0):
         sortKey = 'year'
-    displayAllAttr = input('Display all attributes [y/n]')=="y"
-    attr = []
+    displayAllAttr = input('Display all attributes [y/n] ')=="y"
+    attr = ['year', 'title', 'info.rating', 'info.rank', 'info.running_time_secs', 'info.genres', 'info.plot', 'info.directors', 'info.actors']
     if (not displayAllAttr):
         attr = getDisplayAttributes()
     try:
@@ -165,14 +182,23 @@ def runScan(table, filter):
         )
         print("Result: ")
         sortedResponse = sorted(response['Items'], key=sortHelper, reverse=True)
+        
+        #Print out col names
+        txt = ""
+        for key in attr:
+            txt = txt + key + "\t"
+        print(txt)
+
+        #Print out query
         for i in sortedResponse:
-            if (displayAllAttr):
-                print(i['year'], "\t", i['title'], "\t", i['info']['rating'])
-            else:
-                txt = ""
-                for key in attr:
-                    txt = txt + i[key] + "\t"
-                print(txt)
+            txt = ""
+            for key in attr:
+                txt = txt + str(getVal(i, key)) + "\t"
+            print(txt)
+
+        outputCsv = input("Save to csv? [y/n] ") == "y"
+        if (outputCsv):
+            writeCsv(sortedResponse, attr)
 
     except Exception as e:
         print('Error with query, check filter attributes')
@@ -199,10 +225,7 @@ def scan(table):
                 fe = fe & filter
             runScan(table, fe)
 
-        #fe = Key('year').between(1950, 1959)
-        #fe = fe & Attr('info.rating').gt(8)
-
-        #LOOK AT USING THIS
+        #Look into using this
         #pe = "year, title, info.rating"
 
 
@@ -227,4 +250,4 @@ between <value> <value>
     running = True
     while (running):
         scan(table)
-        running = (input("Run another query? [y/n]") == "y")
+        running = (input("Run another query? [y/n] ") == "y")

@@ -82,6 +82,7 @@ def searchForFile(client, connect_str, fileName, download):
                         with open("./"+blob.name, "wb") as file:
                             blob_client = client.get_blob_client(container=container['name'], blob=blob.name)
                             file.write(blob_client.download_blob().readall())
+                            print('Downloaded: '+blob.name)
         print('')
     except Exception as e:
         print(e)
@@ -115,34 +116,3 @@ if __name__ == "__main__":
                 print("Error no file\n")
                 continue
             searchForFile(client, connect_str, cmd[1], cmd[0]=="4")
-
-    print("Cleaning things up")
-
-'''
-if __name__ == "__main__":
-        try:
-        # Retrieve the connection string for use with the application. 
-        connect_str = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
-
-        # Create the BlobServiceClient object which will be used to reference a container client
-        blob_service_client = BlobServiceClient.from_connection_string(connect_str)
-
-        # List all containers
-        all_containers = blob_service_client.list_containers(include_metadata=True)
-        for container in all_containers:
-            print("\nContainer: " + container['name'])
-            containerName = container['name']
-
-            container_client = ContainerClient.from_connection_string(connect_str, container_name=containerName)
-
-            print("Listing blobs...")
-            # List the blobs in the container
-            blob_list = container_client.list_blobs()
-            for blob in blob_list:
-                print("\t" + blob.name)
-
-        print("\n")
-    except Exception as ex:
-        print('Exception:')
-        print(ex)
-'''
