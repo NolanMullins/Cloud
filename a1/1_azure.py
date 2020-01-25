@@ -1,7 +1,10 @@
 #!/usr/bin/python3
 
+import time
 import os, uuid
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+
+displayTiming = True
 
 def uploadFile(client, containerName, fileName):
     try:
@@ -19,11 +22,15 @@ def createContainer(client, name):
 
 def init(client, connect_str):
     try:
+        t = time.time()
         #create containers
         createContainer(client, "cis1300nolan")
         createContainer(client, "cis3110nolan")
         createContainer(client, "cis4010nolan")
-
+        t = time.time() - t
+        if (displayTiming):
+            print("Done creating containers - "+str(t))
+        t = time.time()
         #upload files
         for i in range(1,5):
             name = "1300Assignment"+str(i)+".pdf"
@@ -37,6 +44,10 @@ def init(client, connect_str):
         uploadFile(client, "cis4010nolan", "4010Assignment1.pdf")
         uploadFile(client, "cis4010nolan", "4010Lecture1.pdf")
         uploadFile(client, "cis4010nolan", "4010Lecture2.pdf")
+
+        t = time.time() - t
+        if (displayTiming):
+            print("Done uploading - "+str(t))
 
     except Exception as e:
         print(e)
@@ -104,6 +115,7 @@ if __name__ == "__main__":
     cmd = "init".split(' ')
     while (cmd[0] != "q" and cmd[0] != "Q"):
         cmd = input('Enter: ').split(' ')
+        t = time.time()
         if (cmd[0] == "1"):
             listAllContainers(client, connect_str)
         elif (cmd[0] == "2"):
@@ -116,3 +128,6 @@ if __name__ == "__main__":
                 print("Error no file\n")
                 continue
             searchForFile(client, connect_str, cmd[1], cmd[0]=="4")
+        t = time.time() - t
+        if (displayTiming):
+            print("Done running cmd - "+str(t))

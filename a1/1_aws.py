@@ -1,8 +1,11 @@
 #!/usr/bin/python3
 
+import time
 import string
 import boto3
 from botocore.exceptions import ClientError
+
+displayTiming = True
 
 def uploadFile(client, bucketName, fileName):
     f = open("data/"+fileName, 'rb')
@@ -10,12 +13,18 @@ def uploadFile(client, bucketName, fileName):
 
 def init():
     try:
+        t = time.time()
         client = boto3.client('s3')
         #create containers
         client.create_bucket(Bucket="cis1300nolan")
         client.create_bucket(Bucket="cis3110nolan")
         client.create_bucket(Bucket="cis4010nolan")
 
+        t = time.time() - t
+        if (displayTiming):
+            print("Done creating buckets - "+str(t))
+
+        t = time.time()
         #upload files
         for i in range(1,5):
             name = "1300Assignment"+str(i)+".pdf"
@@ -29,6 +38,10 @@ def init():
         uploadFile(client, "cis4010nolan", "4010Assignment1.pdf")
         uploadFile(client, "cis4010nolan", "4010Lecture1.pdf")
         uploadFile(client, "cis4010nolan", "4010Lecture2.pdf")
+
+        t = time.time() - t
+        if (displayTiming):
+            print("Done uploading - "+str(t))
 
     except ClientError as e:
         print(e)
@@ -77,6 +90,8 @@ def searchForFile(s3, fileName, download):
 if __name__ == "__main__":
     s3 = boto3.resource('s3')
 
+    #init()
+
     print("""Enter 'q' to quit\n
     1: All containers\n
     2 <container>: A specified container\n
@@ -86,6 +101,8 @@ if __name__ == "__main__":
     cmd = "init".split(' ')
     while (cmd[0] != "q" and cmd[0] != "Q"):
         cmd = input('Enter: ').split(' ')
+        
+        t = time.time()
         if (cmd[0] == "1"):
             listAllContainers(s3)
         elif (cmd[0] == "2"):
@@ -98,5 +115,9 @@ if __name__ == "__main__":
                 print("Error no file\n")
                 continue
             searchForFile(s3, cmd[1], cmd[0]=="4")
+
+        t = time.time() - t
+        if (displayTiming):
+            print("Done running cmd - "+str(t))
 
     print("Cleaning things up")
