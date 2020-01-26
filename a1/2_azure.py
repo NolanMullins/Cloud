@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+#Not done, WIP
 
 import time
 import string
@@ -274,6 +275,7 @@ if __name__ == "__main__":
     endpoint = "https://cis4010moviedb.documents.azure.com"
     client = cosmos_client.CosmosClient(endpoint,  {'masterKey': prim_key})
 
+    #Currently fails to initialize
     database = init(client)
 
     print(""""
