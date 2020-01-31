@@ -59,7 +59,7 @@ def showAllObjIn(s3, bucketName):
             print("\tempty")
         print('')
     except ClientError as e:
-        print(e)
+        print("Error opening container, does it exist?")
 
 def listAllContainers(s3):
     try:
@@ -90,7 +90,7 @@ def searchForFile(s3, fileName, download):
 if __name__ == "__main__":
     s3 = boto3.resource('s3')
 
-    #init()
+    init()
 
     print("""Enter 'q' to quit\n
     1: All containers\n

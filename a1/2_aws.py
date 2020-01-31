@@ -86,6 +86,7 @@ def uploadData(table):
         t = time.time() - t
         print("Done uploading data - "+str(t)) 
     except ClientError as e:
+        print(e)
         print("Error uploading data")
 
 def init(dynamodb, client):
@@ -132,14 +133,17 @@ def getFilterAttribute():
         return -1
 
 def getVal(item, key):
-    if (len(key.split('.')) > 1):
-        keys = key.split('.')
-        tmp = item
-        for key in keys:
-            tmp = tmp[key]
-        return tmp
-    else:
-        return item[key] 
+    try:
+        if (len(key.split('.')) > 1):
+            keys = key.split('.')
+            tmp = item
+            for key in keys:
+                tmp = tmp[key]
+            return tmp
+        else:
+            return item[key] 
+    except Exception:
+        return "N/A"
 
 sortKey = 'year'
 def sortHelper(e):
@@ -177,11 +181,18 @@ def runScan(table, filter):
     if (not displayAllAttr):
         attr = getDisplayAttributes()
     try:
+        t = time.time()
         response = table.scan(
             FilterExpression = filter
         )
         print("Result: ")
-        sortedResponse = sorted(response['Items'], key=sortHelper, reverse=True)
+        t = time.time() - t
+        print("Time taken - "+str(t)) 
+        items = response['Items']
+        try:
+            items = sorted(items, key=sortHelper, reverse=True)
+        except Exception:
+            print("Error sorting items, some items did not contain the sort key")
         
         #Print out col names
         txt = ""
@@ -190,7 +201,7 @@ def runScan(table, filter):
         print(txt)
 
         #Print out query
-        for i in sortedResponse:
+        for i in items:
             txt = ""
             for key in attr:
                 txt = txt + str(getVal(i, key)) + "\t"
@@ -198,7 +209,7 @@ def runScan(table, filter):
 
         outputCsv = input("Save to csv? [y/n] ") == "y"
         if (outputCsv):
-            writeCsv(sortedResponse, attr)
+            writeCsv(items, attr)
 
     except Exception as e:
         print('Error with query, check filter attributes')
@@ -235,7 +246,7 @@ if __name__ == "__main__":
     client = boto3.client('dynamodb')
     table = init(dynamodb, client)
 
-    print(""""
+    print("""
 ************
 Welcome
 Query structure

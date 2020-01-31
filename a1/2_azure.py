@@ -2,6 +2,7 @@
 
 #Not done, WIP
 
+import os
 import time
 import string
 import json
@@ -23,15 +24,6 @@ import azure.cosmos.documents as documents
 
 database_name = 'moviedb'
 container_name = 'movies'
-
-class DecimalEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, decimal.Decimal):
-            if o % 1 > 0:
-                return float(o)
-            else:
-                return int(o)
-        return super(DecimalEncoder, self).default(o)
 
 def getDB(client):
     try:
@@ -62,67 +54,17 @@ def getContainer(client):
     except Exception as e:
         print("Error getting container")
 
-
-def getTable(client):
-    print("Retrieving table")
-    t = time.time()
-    try:
-
-        table = dynamodb.create_table(
-            TableName='Movies',
-            KeySchema=[
-                {
-                    'AttributeName': 'year',
-                    'KeyType': 'HASH'  #Partition key
-                },
-                {
-                    'AttributeName': 'title',
-                    'KeyType': 'RANGE'  #Sort key
-                }
-            ],
-            AttributeDefinitions=[
-                {
-                    'AttributeName': 'year',
-                    'AttributeType': 'N'
-                },
-                {
-                    'AttributeName': 'title',
-                    'AttributeType': 'S'
-                },
-
-            ],
-            ProvisionedThroughput={
-                'ReadCapacityUnits': 10,
-                'WriteCapacityUnits': 10
-            }
-        )
-        t = time.time() - t
-        print("Done creating table - "+str(t))
-        return table
-    except ClientError as e:
-        #Table probably exists already
-        try:
-            table = dynamodb.Table('Movies')
-            t = time.time() - t
-            print("Done retrieving table - "+str(t))
-            return table
-        except ClientError as e:
-            print("Error, could not find or create movie db")
-            exit(0)
-
 def uploadData(client):
     print("Uploading movie data")
     try:
         t = time.time()
         with open("data/moviedata.json") as json_file:
             movies = json.load(json_file)
-            print('loaded movies')
             for movie in movies:
                 year = int(movie['year'])
                 title = movie['title']
                 info = movie['info']
-                client.UpsertItem("dbs/" + database_name + "/colls/" + container_name, 
-                    {
+                client.UpsertItem("dbs/" + database_name + "/colls/" + container_name, {
                         'year': year,
                         'title': title,
                         'info': info,
@@ -138,15 +80,19 @@ def uploadData(client):
 def init(client):
     database = getDB(client)
     container = getContainer(client)
-    uploadData(client)
-    '''
-    if (response['Table']['ItemCount'] == 0):
-        uploadData(table)
+
+    items = client.QueryItems("dbs/" + database_name + "/colls/" + container_name,
+                            'SELECT TOP 1 * FROM ' + container_name + ' r',
+                            {'enableCrossPartitionQuery': True})
+
+    flag = False
+    for item in items:
+        flag = True
+
+    if (not flag):
+        uploadData(client)
     else:
         print('Data already in table')
-    return table
-    '''
-    return database
 
 def getFilterAttribute():
     expression = input("Leave blank to continue\n<Attr> <operator> <value>\n")
@@ -155,30 +101,28 @@ def getFilterAttribute():
     expression = expression.split(' ')
     if (len(expression) < 2):
         return -1
-    value = int(expression[2]) if expression[2].isdigit() else expression[2]
-    if (expression[1] == ">"):
-        return Attr(expression[0]).gt(value)
-    elif (expression[1] == "<"):
-        return Attr(expression[0]).lt(value)
-    elif (expression[1] == "="):
-        return Attr(expression[0]).eq(value)
-    elif (expression[1] == "between"):
+    op = expression[1]
+    if (op == "between"):
         if (len(expression) < 3):
             return -1
-        value2 = int(expression[3]) if expression[3].isdigit() else expression[3]
-        return Attr(expression[0]).between(value, value2)
+        return '(r.'+expression[0] + ' BETWEEN ' + expression[2] + ' AND ' + expression[3]+')'
+    elif(op == ">" or op == "<" or op == "="):
+        return '(r.'+expression[0] + op + expression[2]+')'
     else:
         return -1
 
 def getVal(item, key):
-    if (len(key.split('.')) > 1):
-        keys = key.split('.')
-        tmp = item
-        for key in keys:
-            tmp = tmp[key]
-        return tmp
-    else:
-        return item[key] 
+    try:
+        if (len(key.split('.')) > 1):
+            keys = key.split('.')
+            tmp = item
+            for key in keys:
+                tmp = tmp[key]
+            return tmp
+        else:
+            return item[key] 
+    except Exception:
+        return "N/A"
 
 sortKey = 'year'
 def sortHelper(e):
@@ -189,7 +133,7 @@ def getDisplayAttributes():
     attr = []
     while (not len(txt) == 0):
         attr.append(txt)
-        txt = input('Leave blank to continue\nEnter attribute to display:\n')
+        txt = input('Next:\n')
     return attr
 
 def writeCsv(data, attr):
@@ -206,21 +150,30 @@ def writeCsv(data, attr):
     except Exception as e:
         print('Error writing file')
 
-def runScan(table, filter):
+def runQuery(client, expression):
+    print(expression)
     global sortKey
     sortKey = input('Sort by: \n')
-    if (len(sortKey)==0):
-        sortKey = 'year'
     displayAllAttr = input('Display all attributes [y/n] ')=="y"
     attr = ['year', 'title', 'info.rating', 'info.rank', 'info.running_time_secs', 'info.genres', 'info.plot', 'info.directors', 'info.actors']
     if (not displayAllAttr):
         attr = getDisplayAttributes()
     try:
-        response = table.scan(
-            FilterExpression = filter
-        )
+        t = time.time()
+        filter = expression
+        if (len(filter) > 0):
+            filter = 'WHERE '+filter
+        items = client.QueryItems("dbs/" + database_name + "/colls/" + container_name,
+                              'SELECT * FROM ' + container_name + ' r '+filter,
+                              {'enableCrossPartitionQuery': True})
         print("Result: ")
-        sortedResponse = sorted(response['Items'], key=sortHelper, reverse=True)
+        t = time.time() - t
+        print("Time taken - "+str(t)) 
+        try:
+            if (len(sortKey)>0):
+                items = sorted(items, key=sortHelper, reverse=True)
+        except Exception:
+            print("Error sorting items, some items did not contain the sort key")
         
         #Print out col names
         txt = ""
@@ -229,7 +182,7 @@ def runScan(table, filter):
         print(txt)
 
         #Print out query
-        for i in sortedResponse:
+        for i in items:
             txt = ""
             for key in attr:
                 txt = txt + str(getVal(i, key)) + "\t"
@@ -237,22 +190,20 @@ def runScan(table, filter):
 
         outputCsv = input("Save to csv? [y/n] ") == "y"
         if (outputCsv):
-            writeCsv(sortedResponse, attr)
+            writeCsv(items, attr)
 
     except Exception as e:
         print('Error with query, check filter attributes')
         print(e)
 
-def scan(table):
-        filter = getFilterAttribute()
-        if (filter == -1):
+def query(client):
+        expression = getFilterAttribute()
+        if (expression == -1):
             print('Error with expression')
             return
-        if (filter == 0):
-            fe = Key('year').between(1900, 9999)
-            runScan(table, fe)
+        if (expression == 0):
+            runQuery(client, '')
         else:
-            fe = filter
             building = True
             while (building):
                 filter = getFilterAttribute()
@@ -261,24 +212,18 @@ def scan(table):
                     break
                 if (filter == 0):
                     break
-                fe = fe & filter
-            runScan(table, fe)
-
-        #Look into using this
-        #pe = "year, title, info.rating"
-
-
+                expression = expression + ' AND ' + filter
+            runQuery(client, expression)
 
 if __name__ == "__main__":
-    connect_str = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
-    prim_key = "xK1QlnhPCtJuiaIyP6uVAjHtOglOZlHWWZJZ7x5YcCI6QusExAe7szgUyZx8L8hGN0lGCT1Bae58CSbwdb3PSQ=="
-    endpoint = "https://cis4010moviedb.documents.azure.com"
-    client = cosmos_client.CosmosClient(endpoint,  {'masterKey': prim_key})
+    url = os.environ['ACCOUNT_URI']
+    key = os.environ['ACCOUNT_KEY']
+    client = cosmos_client.CosmosClient(url, {'masterKey': key})
 
     #Currently fails to initialize
-    database = init(client)
+    init(client)
 
-    print(""""
+    print("""
 ************
 Welcome
 Query structure
@@ -290,10 +235,9 @@ Available operators:
 between <value> <value>
 ************""")
 
-    exit(0)
     running = True
     while (running):
-        scan(table)
+        query(client)
         running = (input("Run another query? [y/n] ") == "y")
 
     print("Running")

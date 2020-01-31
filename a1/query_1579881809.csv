@@ -1,0 +1,20 @@
+year,title,info.rating,info.rank,info.running_time_secs,info.genres
+1952,Singin' in the Rain,8.4,2116,6180,"['Comedy', 'Musical', 'Romance']"
+1951,Strangers on a Train,8.2,2860,6060,"['Crime', 'Film-Noir', 'Thriller']"
+1952,High Noon,8.2,3051,5100,"['Drama', 'Western']"
+1955,Les diaboliques,8.2,4518,6840,"['Mystery', 'Thriller']"
+1955,The Night of the Hunter,8.1,4082,5580,"['Crime', 'Drama', 'Mystery', 'Thriller']"
+1951,A Streetcar Named Desire,8,1928,7320,['Drama']
+1951,The African Queen,8,4450,6300,"['Adventure', 'Romance', 'War']"
+1955,East of Eden,8,486,6900,"['Drama', 'Romance']"
+1951,The Day the Earth Stood Still,7.9,3598,5520,"['Drama', 'Sci-Fi', 'Thriller']"
+1952,The Quiet Man,7.8,2855,7740,"['Comedy', 'Drama', 'Romance']"
+1955,Rebel Without a Cause,7.8,2176,6660,"['Drama', 'Romance']"
+1955,To Catch a Thief,7.5,3471,6360,"['Crime', 'Mystery', 'Romance', 'Thriller']"
+1951,Alice in Wonderland,7.4,1835,4500,"['Animation', 'Adventure', 'Family', 'Fantasy', 'Musical']"
+1955,Lady and the Tramp,7.4,3492,4560,"['Animation', 'Adventure', 'Comedy', 'Romance']"
+1951,An American in Paris,7.2,3054,6780,"['Musical', 'Romance']"
+1955,The Seven Year Itch,7.2,4521,6300,"['Comedy', 'Romance']"
+1951,Storm Warning,7,3618,5580,"['Drama', 'Film-Noir']"
+1952,The Member of the Wedding,6.8,4597,5580,['Drama']
+1951,Operation Pacific,6.5,2917,6660,"['Drama', 'War']"

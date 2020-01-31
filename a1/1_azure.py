@@ -68,7 +68,7 @@ def showAllObjIn(connect_str, containerName):
             print("\tempty")
         print('')
     except Exception as e:
-        print(e)
+        print("Error opening container, does it exist?")
 
 def listAllContainers(client, connect_str):
     try:
