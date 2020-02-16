@@ -1,2 +1,2 @@
 Platform,Instance,VM Name,VM Size,Storage Y/N,Storage Type,Storage size,sshkey file
-AWS,aws-01-linux,testing,t2-micro,Y,EBS,8,team01.pem
+AWS,ami-0a887e401f7654935,test-py-vm,t2.micro,Y,EBS,8,testing.pem
