@@ -1,0 +1,2 @@
+Platform,Instance,VM Name,VM Size,Storage Y/N,Storage Type,Storage size,sshkey file
+AWS,aws-01-linux,testing,t2-micro,Y,EBS,8,team01.pem
