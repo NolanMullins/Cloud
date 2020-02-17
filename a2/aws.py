@@ -24,9 +24,9 @@ def attachVolAWS(id, zone, size):
 def createAWSVM(vm, docker):
     #Create ssh key
     try:
-        outfile = open('keys/'+vm[7],'w')
         key_pair = ec2.create_key_pair(KeyName=vm[7].split(".")[0])
         keyPairOut = str(key_pair.key_material)
+        outfile = open('keys/'+vm[7],'w')
         outfile.write(keyPairOut)
     except:
         pass
@@ -119,11 +119,11 @@ def drawUpdateAWS(win):
         win.addstr(y, x+24, status['InstanceState']['Name']+'\n')
         if status['InstanceId'] in desc.keys():
             y, x = win.getyx()
-            win.addstr(y, x+10, desc[status['InstanceId']]['ImageId']+'\n')
-            win.addstr(y+1, x+10, desc[status['InstanceId']]['InstanceType']+'\n')
+            win.addstr(y, x+4, 'System: '+desc[status['InstanceId']]['ImageId']+'\n')
+            win.addstr(y+1, x+4, 'Type: '+desc[status['InstanceId']]['InstanceType']+'\n')
             if DISPLAY_STORAGE:
                 for block in desc[status['InstanceId']]['BlockDeviceMappings']:
-                    win.addstr(y+2, x+10, str(ec2.Volume(block['Ebs']['VolumeId']).size)+'\n')
+                    win.addstr(y+2, x+4, 'Storage: '+str(ec2.Volume(block['Ebs']['VolumeId']).size)+'GB\n')
             win.addstr('\n')
 
 def main(win):
