@@ -12,7 +12,6 @@ import os
 from botocore.exceptions import ClientError
 import curses
 import datetime
-import asyncio
 
 DISPLAY_STORAGE = True
 
