@@ -13,8 +13,18 @@ from botocore.exceptions import ClientError
 import curses
 import datetime
 
+import azure
+from azure.common.client_factory import get_client_from_auth_file
+from azure.mgmt.resource import ResourceManagementClient
+from azure.mgmt.network import NetworkManagementClient
+from azure.mgmt.compute import ComputeManagementClient
+from azure.mgmt.compute.models import DiskCreateOption
+from msrestazure.azure_exceptions import CloudError
+
 DISPLAY_STORAGE = True
 
+
+#region [rgba(160,32,240,0.1)] AWS
 def attachVolAWS(id, zone, size):
     volume = ec2.create_volume(Size=size, AvailabilityZone=zone)
     time.sleep(30)
@@ -45,6 +55,189 @@ def createAWSVM(vm, docker):
     id = response[0].instance_id
     return id
 
+def killAWS():
+    instances = ec2.meta.client.describe_instance_status(IncludeAllInstances=True)['InstanceStatuses']
+    ids = []
+    for s in instances:
+        ids.append(s['InstanceId'])
+    ec2_c.terminate_instances(InstanceIds=ids)
+
+def rebootAWS():
+    instances = ec2.meta.client.describe_instance_status(IncludeAllInstances=True)['InstanceStatuses']
+    ids = []
+    for s in instances:
+        ids.append(s['InstanceId'])
+    ec2_c.reboot_instances(InstanceIds=ids)
+
+#endregion
+
+#region [rgba(100,200,0,0.1)] AZURE
+debian = {
+    "offer": "debian-10",
+    "publisher": "Debian",
+    "sku": "10",
+    "urn": "Debian:debian-10:10:latest",
+    "urnAlias": "Debian",
+    "version": "latest"
+}
+
+redHat = {
+    "offer": "RHEL",
+    "publisher": "RedHat",
+    "sku": "7-LVM",
+    "urn": "RedHat:RHEL:7-LVM:latest",
+    "urnAlias": "RHEL",
+    "version": "latest"
+}
+
+ubuntu = {
+    "offer": "UbuntuServer",
+    "publisher": "Canonical",
+    "sku": "18.04-LTS",
+    "urn": "Canonical:UbuntuServer:18.04-LTS:latest",
+    "urnAlias": "UbuntuLTS",
+    "version": "latest"
+}
+images = {}
+images['debian'] = debian
+images['redHat'] = redHat
+images['ubuntu'] = ubuntu
+
+#https://docs.microsoft.com/en-us/python/api/azure-mgmt-network/azure.mgmt.network.v2019_11_01.operations.networkinterfacesoperations?view=azure-python
+def create_nic(resourceGroup, uid):
+    #create vnet
+    async_vnet_creation = network_client.virtual_networks.create_or_update(
+        resourceGroup,
+        uid+'-vnet',
+        {
+            'location': 'eastus',
+            'address_space': {
+                'address_prefixes': ['10.0.0.0/16']
+            }
+        }
+    )
+    async_vnet_creation.wait()
+
+    # Create Subnet
+    async_subnet_creation = network_client.subnets.create_or_update(
+        resourceGroup,
+        uid+'-vnet',
+        uid+'-snet',
+        {'address_prefix': '10.0.0.0/24'}
+    )
+    subnet_info = async_subnet_creation.result()
+
+    # Create NIC
+    async_nic_creation = network_client.network_interfaces.create_or_update(
+        resourceGroup,
+        uid+'-nic',
+        {
+            'location': 'eastus',
+            'ip_configurations': [{
+                'name': uid+'-ip',
+                'subnet': {
+                    'id': subnet_info.id
+                }
+            }]
+        }
+    )
+    return async_nic_creation.result()
+
+def create_vm_parameters(nic_id, vm):
+    return {
+        'location': 'eastus',
+        'os_profile': {
+            'computer_name': vm[2],
+            'admin_username': 'adminL0gin',
+            'admin_password': 'myPa$$w0rd'
+        },
+        'hardware_profile': {
+            'vm_size': vm[3]
+        },
+        'storage_profile': {
+            'image_reference': images[vm[1]]
+        },
+        'network_profile': {
+            'network_interfaces': [{
+                'id': nic_id,
+            }]
+        },
+    }
+
+def createAzureVM(vm, docker):
+    #resource_client = get_client_from_auth_file(ResourceManagementClient, auth_path='credentials.json')
+    # Create a NIC
+    resourceGroup = 'cis4010A2'
+    id = ''
+    try:
+        nic = create_nic(resourceGroup, vm[2])
+        id = nic.id
+    except:
+        nic = network_client.virtual_networks.get('cis4010A2', vm[2]+'-nic')
+        id = nic.id
+        pass
+    # Create Linux VM
+    #print('\nCreating Linux Virtual Machine')
+    vm_parameters = create_vm_parameters(id, vm)
+    async_vm_creation = compute_client.virtual_machines.create_or_update('cis4010A2', vm[2], vm_parameters)
+    async_vm_creation.wait()
+
+    # Create managed data disk
+    #print('\nCreate (empty) managed Data Disk')
+    async_disk_creation = compute_client.disks.create_or_update(
+        resourceGroup,
+        vm[2]+'-disk',
+        {
+            'location': 'eastus',
+            'disk_size_gb': int(vm[6]),
+            'creation_data': {
+                'create_option': DiskCreateOption.empty
+            }
+        }
+    )
+    data_disk = async_disk_creation.result()
+
+    # Get the virtual machine by name
+    #print('\nGet Virtual Machine by Name')
+    virtual_machine = compute_client.virtual_machines.get(
+        resourceGroup,
+        vm[2]
+    )
+
+    # Attach data disk
+    #print('\nAttach Data Disk')
+    virtual_machine.storage_profile.data_disks.append({
+        'lun': 12,
+        'name': vm[2]+'-disk',
+        'create_option': DiskCreateOption.attach,
+        'managed_disk': {
+            'id': data_disk.id
+        }
+    })
+    async_disk_attach = compute_client.virtual_machines.create_or_update(
+        resourceGroup,
+        virtual_machine.name,
+        virtual_machine
+    )
+    async_disk_attach.wait()
+
+    
+def killAzure():
+    deletedVMs = []
+    for vm in compute_client.virtual_machines.list_all():
+        deletedVMs.append(compute_client.virtual_machines.delete('cis4010A2', vm.name))
+        network_client.virtual_networks.delete('cis4010A2', vm[2]+'-nic')
+    for deleted in deletedVMs:
+        deleted.wait()
+
+def rebootAzure():
+    vms = []
+    for vm in compute_client.virtual_machines.list_all():
+        vms.append(compute_client.virtual_machines.restart('cis4010A2', vm.name))
+    for vm in vms:
+        vm.wait()
+#endregion
+
 def readFiles():
     vms = []
     docker = {}
@@ -69,26 +262,21 @@ def loadInstancesFromFile():
     for vm in vms:
         if vm[0]=='AWS':
             createAWSVM(vm, docker)
+        elif (vm[0]=='AZURE'):
+            createAzureVM(vm, docker)
 
 def rebootVMs():
-    #aws
-    instances = ec2.meta.client.describe_instance_status(IncludeAllInstances=True)['InstanceStatuses']
-    ids = []
-    for s in instances:
-        ids.append(s['InstanceId'])
-    ec2_c.reboot_instances(InstanceIds=ids)
+    rebootAWS()
+    rebootAzure()
 
 def killVMs():
-    #aws
-    instances = ec2.meta.client.describe_instance_status(IncludeAllInstances=True)['InstanceStatuses']
-    ids = []
-    for s in instances:
-        ids.append(s['InstanceId'])
-    ec2_c.terminate_instances(InstanceIds=ids)
+    killAWS()
+    killAzure()
 
 def debugFnc():
     return str('test')
 
+#region [rgba(80,0,0,0.2)] curses
 def drawHeader(win):
     win.addstr(0,0,"***********************\n")
     win.addstr("Instance status\n")
@@ -125,6 +313,12 @@ def drawUpdateAWS(win):
                     win.addstr(y+2, x+4, 'Storage: '+str(ec2.Volume(block['Ebs']['VolumeId']).size)+'GB\n')
             win.addstr('\n')
 
+def drawUpdateAzure(win):
+    win.addstr('\n')
+    for vm in compute_client.virtual_machines.list_all():
+        win.addstr(vm.name+'\n')
+    win.addstr('\n')
+
 def main(win):
     key=""
     msg=""
@@ -138,6 +332,7 @@ def main(win):
             #Draw VM information
             drawHeader(win)
             drawUpdateAWS(win)
+            drawUpdateAzure(win)
             drawFooter(win, msg)
 
             #debug
@@ -174,13 +369,7 @@ def main(win):
             if key == 113:
                 break    
             pass         
-
-
-def printUpdate(vms):
-    os.system('clear')
-    for vm in vms:
-        print(vm)
-    print('q to quit')
+#endregion
 
 if __name__ == "__main__":
 
@@ -188,6 +377,10 @@ if __name__ == "__main__":
     ec2_c = boto3.client('ec2', region_name='us-east-1')
     global ec2
     ec2 = boto3.resource('ec2', region_name='us-east-1')
+    global compute_client
+    compute_client = get_client_from_auth_file(ComputeManagementClient, auth_path='credentials.json')
+    global network_client
+    network_client = get_client_from_auth_file(NetworkManagementClient, auth_path='credentials.json')
     curses.wrapper(main)
 
     '''
