@@ -1,0 +1,2 @@
+Platform,Instance,VM Name,VM Size,Storage Y/N,Storage Type,Storage size,sshkey file
+AZURE,redHat,redHatVM,Standard_B1ls,Y,standard,24,

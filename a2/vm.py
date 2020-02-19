@@ -223,19 +223,14 @@ def createAzureVM(vm, docker):
 
     
 def killAzure():
-    deletedVMs = []
     for vm in compute_client.virtual_machines.list_all():
-        deletedVMs.append(compute_client.virtual_machines.delete('cis4010A2', vm.name))
-        network_client.virtual_networks.delete('cis4010A2', vm[2]+'-nic')
-    for deleted in deletedVMs:
-        deleted.wait()
+        compute_client.virtual_machines.delete('cis4010A2', vm.name)
+        #TODO need to detach vm from nic before deleting
+        network_client.virtual_networks.delete('cis4010A2', vm.name+'-nic')
 
 def rebootAzure():
-    vms = []
     for vm in compute_client.virtual_machines.list_all():
-        vms.append(compute_client.virtual_machines.restart('cis4010A2', vm.name))
-    for vm in vms:
-        vm.wait()
+        compute_client.virtual_machines.restart('cis4010A2', vm.name)
 #endregion
 
 def readFiles():
@@ -316,7 +311,13 @@ def drawUpdateAWS(win):
 def drawUpdateAzure(win):
     win.addstr('\n')
     for vm in compute_client.virtual_machines.list_all():
-        win.addstr(vm.name+'\n')
+        states = compute_client.virtual_machines.instance_view('cis4010A2', vm.name, expand='instanceView').statuses
+        state = states[0].display_status
+        if (len(states) > 1):
+            state = states[1].display_status
+        y, x = win.getyx()
+        win.addstr(y, x, vm.name)
+        win.addstr(y, x+24, state+'\n')
     win.addstr('\n')
 
 def main(win):

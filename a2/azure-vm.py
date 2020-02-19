@@ -15,6 +15,8 @@ from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.models import DiskCreateOption
+from azure.mgmt.monitor import MonitorManagementClient
+
 from msrestazure.azure_exceptions import CloudError
 
 #Useful example
@@ -198,7 +200,9 @@ if __name__ == "__main__":
     compute_client = get_client_from_auth_file(ComputeManagementClient, auth_path='credentials.json')
     network_client = get_client_from_auth_file(NetworkManagementClient, auth_path='credentials.json')
     resource_client = get_client_from_auth_file(ResourceManagementClient, auth_path='credentials.json')
+    monitor_client = get_client_from_auth_file(MonitorManagementClient, auth_path='credentials.json')
 
+    '''
     vms, docker = readFiles()
     for vm in vms:
         if (vm[0]=='AZURE'):
@@ -208,12 +212,28 @@ if __name__ == "__main__":
 
     #az vm list-ip-addresses -o table
     #az vm image list
-    for vm in client.virtual_machines.list_all():
+    #print(compute_client.InstanceViewStatus())
+    
+    state = compute_client.virtual_machines.get('cis4010A2', 'redHatVM', expand='instanceview').instance_view.statuses[1].display_status
+    print(state)
+
+    vm = compute_client.virtual_machines.instance_view('cis4010A2', 'redHatVM')
+    print(vm.statuses[1])
+    vms = compute_client.virtual_machines.list_all()
+    print(vms)
+    
+    for vm in vms:
         print(vm.name)
-        print(vm.hardware_profile)
-        print(vm.network_profile)
+        state = compute_client.virtual_machines.instance_view('cis4010A2', vm.name, expand='instanceView').statuses #[1].display_status
+        print(state[0])
+    '''
+        print(vm.hardware_profile.vm_size)
+        print(vm.storage_profile.image_reference.offer)
+        print(vm.os_profile)
         print(vm.network_profile.network_interfaces)
+        print()
         print(vm)
+        print()
         #print(vm.network_profile.network_interface)
     '''
 
