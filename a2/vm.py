@@ -30,7 +30,8 @@ def attachVolAWS(id, zone, size):
     time.sleep(30)
     ec2.Instance(id).attach_volume(VolumeId=volume.id, Device='/dev/sdy')
 
-def createAWSVM(vm, docker):
+def createAWSVM(win, vm, docker):
+    win.addstr('\n\nCreating AWS VM: '+vm[2]+'\n')
     #Create ssh key
     try:
         key_pair = ec2.create_key_pair(KeyName=vm[7].split(".")[0])
@@ -116,7 +117,7 @@ def create_nic(resourceGroup, uid):
             }
         }
     )
-    async_vnet_creation.wait()
+    #async_vnet_creation.wait()
 
     # Create Subnet
     async_subnet_creation = network_client.subnets.create_or_update(
@@ -127,6 +128,16 @@ def create_nic(resourceGroup, uid):
     )
     subnet_info = async_subnet_creation.result()
 
+    public_ip_creation = network_client.public_ip_addresses.create_or_update(
+        'cis4010A2', 
+        uid+'-pub-ip',
+        {
+            'location': 'eastus'
+        }
+    )
+    pub_ip = public_ip_creation.result()
+
+
     # Create NIC
     async_nic_creation = network_client.network_interfaces.create_or_update(
         resourceGroup,
@@ -135,6 +146,12 @@ def create_nic(resourceGroup, uid):
             'location': 'eastus',
             'ip_configurations': [{
                 'name': uid+'-ip',
+                "properties": {
+                    "privateIPAllocationMethod": "Dynamic",
+                    "publicIPAddress": {
+                        "id": pub_ip.id
+                    },
+                },
                 'subnet': {
                     'id': subnet_info.id
                 }
@@ -164,26 +181,31 @@ def create_vm_parameters(nic_id, vm):
         },
     }
 
-def createAzureVM(vm, docker):
-    #resource_client = get_client_from_auth_file(ResourceManagementClient, auth_path='credentials.json')
+def createAzureVM(win, vm, docker):
+    win.addstr('\n\nCreating Azure VM: '+vm[2]+'\n')
+    win.refresh()
     # Create a NIC
     resourceGroup = 'cis4010A2'
     id = ''
+    win.addstr('Creating network interface\n')
+    win.refresh()
     try:
         nic = create_nic(resourceGroup, vm[2])
         id = nic.id
     except:
-        nic = network_client.virtual_networks.get('cis4010A2', vm[2]+'-nic')
+        nic = network_client.network_interfaces.get('cis4010A2', vm[2]+'-nic')
         id = nic.id
         pass
     # Create Linux VM
-    #print('\nCreating Linux Virtual Machine')
+    win.addstr('Creating machine\n')
+    win.refresh()
     vm_parameters = create_vm_parameters(id, vm)
     async_vm_creation = compute_client.virtual_machines.create_or_update('cis4010A2', vm[2], vm_parameters)
-    async_vm_creation.wait()
+    #async_vm_creation.wait()
 
     # Create managed data disk
-    #print('\nCreate (empty) managed Data Disk')
+    win.addstr('Creating disk\n')
+    win.refresh()
     async_disk_creation = compute_client.disks.create_or_update(
         resourceGroup,
         vm[2]+'-disk',
@@ -205,7 +227,8 @@ def createAzureVM(vm, docker):
     )
 
     # Attach data disk
-    #print('\nAttach Data Disk')
+    win.addstr('Attaching disk\n')
+    win.refresh()
     virtual_machine.storage_profile.data_disks.append({
         'lun': 12,
         'name': vm[2]+'-disk',
@@ -219,14 +242,14 @@ def createAzureVM(vm, docker):
         virtual_machine.name,
         virtual_machine
     )
-    async_disk_attach.wait()
+    #async_disk_attach.wait()
 
     
 def killAzure():
     for vm in compute_client.virtual_machines.list_all():
         compute_client.virtual_machines.delete('cis4010A2', vm.name)
         #TODO need to detach vm from nic before deleting
-        network_client.virtual_networks.delete('cis4010A2', vm.name+'-nic')
+        #network_client.virtual_networks.delete('cis4010A2', vm.name+'-nic')
 
 def rebootAzure():
     for vm in compute_client.virtual_machines.list_all():
@@ -252,13 +275,13 @@ def readFiles():
             docker[name] = row
     return vms, docker
 
-def loadInstancesFromFile():
+def loadInstancesFromFile(win):
     vms, docker = readFiles()
     for vm in vms:
         if vm[0]=='AWS':
-            createAWSVM(vm, docker)
+            createAWSVM(win, vm, docker)
         elif (vm[0]=='AZURE'):
-            createAzureVM(vm, docker)
+            createAzureVM(win, vm, docker)
 
 def rebootVMs():
     rebootAWS()
@@ -317,7 +340,13 @@ def drawUpdateAzure(win):
             state = states[1].display_status
         y, x = win.getyx()
         win.addstr(y, x, vm.name)
-        win.addstr(y, x+24, state+'\n')
+        win.addstr(y, x+16, state+'\n')
+        try:
+            public_ip = network_client.public_ip_addresses.get('cis4010A2', vm.name+'-pub-ip')
+            win.addstr(y, x+36, str(public_ip.ip_address))
+        except:
+            pass
+        win.addstr('\n')
     win.addstr('\n')
 
 def main(win):
@@ -339,15 +368,17 @@ def main(win):
             #debug
             #win.addstr('key: '+str(key)+'\n')
             if key == 113:
+                exit(0)
                 break           
             elif key == 102:
                 msg = debugFnc()
             elif key == 99:
                 try:
-                    loadInstancesFromFile()
+                    loadInstancesFromFile(win)
                     msg = "Created new instances"
                 except Exception as e:
                     msg = "Error creating instance: "+str(e)
+                    win.timeout(5000)          
             elif key == 114:
                 try:
                     rebootVMs()
@@ -357,6 +388,7 @@ def main(win):
             elif key == 116:
                 try:
                     killVMs()
+                    time.sleep(1)
                     msg = "Terminating instances"
                 except Exception as e:
                     msg = "Failed to terminate instances "+e

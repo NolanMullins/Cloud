@@ -1,4 +1,2 @@
 Platform,Instance,VM Name,VM Size,Storage Y/N,Storage Type,Storage size,sshkey file
-AWS,ami-0a887e401f7654935,testpyvm,t2.micro,Y,gp2,24,testing4.pem
-AWS,ami-07ebfd5b3428b6f4d,ubuntuServer,t2.micro,Y,standard,32,testing4.pem
-AZURE,redHat,redHatVM,Standard_B1ls,Y,standard,24,
+AZURE,redHat,redHatVM-2,Standard_B1ls,Y,standard,24,

@@ -185,6 +185,12 @@ def create_nic(network_client, resourceGroup, uid):
             'location': 'eastus',
             'ip_configurations': [{
                 'name': uid+'-ip',
+                "properties": {
+                    "privateIPAllocationMethod": "Dynamic",
+                    "publicIPAddress": {
+                        "id": publicId
+                    },
+                },
                 'subnet': {
                     'id': subnet_info.id
                 }
@@ -203,30 +209,49 @@ if __name__ == "__main__":
     monitor_client = get_client_from_auth_file(MonitorManagementClient, auth_path='credentials.json')
 
     '''
+    public_ip = network_client.public_ip_addresses.create_or_update(
+        'cis4010A2', 
+        'testing-pub-ip',
+        {
+            'location': 'eastus'
+        }
+    )
+    print(public_ip.result())
+    exit(0)
+
     vms, docker = readFiles()
     for vm in vms:
         if (vm[0]=='AZURE'):
             createAzureVM(compute_client, network_client, resource_client, vm, docker)
-
     '''
 
     #az vm list-ip-addresses -o table
     #az vm image list
     #print(compute_client.InstanceViewStatus())
     
+    '''
     state = compute_client.virtual_machines.get('cis4010A2', 'redHatVM', expand='instanceview').instance_view.statuses[1].display_status
     print(state)
 
     vm = compute_client.virtual_machines.instance_view('cis4010A2', 'redHatVM')
     print(vm.statuses[1])
-    vms = compute_client.virtual_machines.list_all()
     print(vms)
+    '''
+
+    net_interface = network_client.network_interfaces.get('cis4010A2', 'redHatVM-test-test-nic')
+    public_ip = network_client.public_ip_addresses.get('cis4010A2', 'testing-pub-ip')
+    print(public_ip.ip_address)
+    #print(net_interface.ip_configurations)
+    #print(net_interface.ip_configurations[0].public_ip_address)
+
+    exit(0)
+    vms = compute_client.virtual_machines.list_all()
     
     for vm in vms:
         print(vm.name)
-        state = compute_client.virtual_machines.instance_view('cis4010A2', vm.name, expand='instanceView').statuses #[1].display_status
-        print(state[0])
-    '''
+        state = compute_client.virtual_machines.instance_view('cis4010A2', vm.name, expand='instanceView')#.statuses #[1].display_status
+        for disk in state.disks:
+            print(disk.statuses[0])
         print(vm.hardware_profile.vm_size)
         print(vm.storage_profile.image_reference.offer)
         print(vm.os_profile)
@@ -235,10 +260,9 @@ if __name__ == "__main__":
         print(vm)
         print()
         #print(vm.network_profile.network_interface)
-    '''
 
 #useful
-'''
+    '''
         # Delete Resource group and everything in it
         print('\nDelete Resource Group')
         delete_async_operation = resource_client.resource_groups.delete(
