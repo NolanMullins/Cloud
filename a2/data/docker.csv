@@ -1,1 +1,2 @@
-Instance,Docker image,Registery,Background Y/Naws-01-linux,mongo,library,Y
+Instance,Docker image,Registery,Background Y/N
+awsDockerVM,mongo,library,Y

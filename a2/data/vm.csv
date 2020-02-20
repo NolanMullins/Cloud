@@ -1,2 +1,2 @@
 Platform,Instance,VM Name,VM Size,Storage Y/N,Storage Type,Storage size,sshkey file
-AWS,ami-0a887e401f7654935,docker-vm,t2.micro,Y,gp2,8,testing6.pem
+AWS,ami-0a887e401f7654935,awsDockerVM,t2.micro,Y,gp2,8,testing6.pem

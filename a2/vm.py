@@ -20,10 +20,55 @@ from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.models import DiskCreateOption
 from msrestazure.azure_exceptions import CloudError
-import pxssh
+from pexpect import pxssh
 
 DISPLAY_STORAGE = True
 
+awsos = {}
+awsos['ami-0a887e401f7654935'] = 'Amazon Linux'
+awsos['ami-0e2ff28bfb72a4e45'] = 'Amazon Linux'
+awsos['ami-0c322300a1dd5dc79'] = 'Red Hat'
+awsos['ami-0df6cfabfbe4385b7'] = 'SUSE Linux'
+awsos['ami-07ebfd5b3428b6f4d'] = 'Ubuntu Server'
+
+#region [rgba(100,202,240,0.1)] Docker
+def buildDockerScript(id, os, docker):
+    cmd = 'apt'
+    if os == 'Amazon Linux':
+        cmd = 'yum'
+    script = "#!/bin/bash\n"
+    script = script + 'sudo '+cmd+' update -y \n'
+    script = script + 'sudo '+cmd+' update -y \n'
+    script = script + 'sudo '+cmd+' install -y docker \n'
+    script = script + 'sudo service docker start \n'
+    for image in docker:
+        if image[0] == id:
+            script = script + 'sudo docker run '+image[1]+' \n'
+    return script
+
+def runDockerPs(host, user, key):
+    result = ''
+    s = pxssh.pxssh()
+    if not s.login (server=host, username=user, ssh_key=key):
+        return "SSH session failed on login."+str(s)
+    else:
+       s.sendline('sudo docker ps -a') 
+       s.prompt()
+       result = s.before
+       s.logout()
+       return result
+
+def runDockerPsAWS(ip, key):
+    host = 'ec2'
+    for num in ip.split('.'):
+        host = host + '-' + num
+    host = host + '.compute-1.amazonaws.com'
+    user = 'ec2-user'
+    return runDockerPs(host, user, key)
+        
+def runDockerPsAzure(ip, key):
+    return runDockerPs(ip, 'adminL0gin', key)
+#endregion 
 
 #region [rgba(160,32,240,0.1)] AWS
 #TODO docker
@@ -53,6 +98,7 @@ def createAWSVM(win, vm, docker):
     #Create instance 
     win.addstr('Creating VM instance\n')
     win.refresh()
+    script = buildDockerScript(vm[2], awsos[vm[1]], docker)
     response = ec2.create_instances(BlockDeviceMappings=[
         {
             'DeviceName': '/dev/xvda',
@@ -64,7 +110,7 @@ def createAWSVM(win, vm, docker):
                 'VolumeType': vm[5] ,
             }
         },
-    ],ImageId=vm[1], MinCount=1, MaxCount=1, InstanceType=vm[3], KeyName=vm[7].split(".")[0])
+    ],ImageId=vm[1], MinCount=1, MaxCount=1, InstanceType=vm[3], KeyName=vm[7].split(".")[0], UserData=script)
     id = response[0].instance_id
     return id
 
@@ -152,7 +198,6 @@ def create_nic(resourceGroup, uid):
     )
     pub_ip = public_ip_creation.result()
 
-
     # Create NIC
     async_nic_creation = network_client.network_interfaces.create_or_update(
         resourceGroup,
@@ -176,12 +221,22 @@ def create_nic(resourceGroup, uid):
     return async_nic_creation.result()
 
 def create_vm_parameters(nic_id, vm):
+    keyFile = open('keys/azureKey.pub','r')
     return {
         'location': 'eastus',
         'os_profile': {
             'computer_name': vm[2],
             'admin_username': 'adminL0gin',
-            'admin_password': 'myPa$$w0rd'
+            'admin_password': 'myPa$$w0rd',
+            'linux_configuration': {
+                'disable_password_authentication': True,
+                'ssh': {
+                    'public_keys': [{
+                        'path': '/home/adminL0gin/.ssh/authorized_keys',
+                        'key_data': keyFile.read()
+                    }]
+                }
+            },
         },
         'hardware_profile': {
             'vm_size': vm[3]
@@ -273,7 +328,7 @@ def rebootAzure():
 
 def readFiles():
     vms = []
-    docker = {}
+    docker = []
     with open('data/vm.csv') as csvFile:
         reader = csv.reader(csvFile)
         #Skip header
@@ -286,8 +341,7 @@ def readFiles():
         #Skip header
         next(reader, None)
         for row in reader:
-            name = row.pop(0)
-            docker[name] = row
+            docker.append(row)
     return vms, docker
 
 def loadInstancesFromFile(win):
@@ -351,7 +405,10 @@ def drawUpdateAWS(win):
         win.addstr(y, x+48, ip_str+'\n')
         if status['InstanceId'] in desc.keys():
             y, x = win.getyx()
-            win.addstr(y, x+4, 'System: '+desc[status['InstanceId']]['ImageId']+'\n')
+            try:
+                win.addstr(y, x+4, 'System: '+awsos[desc[status['InstanceId']]['ImageId']]+'\n')
+            except:
+                pass
             win.addstr(y+1, x+4, 'Type: '+desc[status['InstanceId']]['InstanceType']+'\n')
             if DISPLAY_STORAGE:
                 for block in desc[status['InstanceId']]['BlockDeviceMappings']:
@@ -359,7 +416,6 @@ def drawUpdateAWS(win):
             win.addstr('\n')
 
 def drawUpdateAzure(win):
-    win.addstr('\n')
     for vm in compute_client.virtual_machines.list_all():
         states = compute_client.virtual_machines.instance_view('cis4010A2', vm.name, expand='instanceView').statuses
         state = states[0].display_status
@@ -376,13 +432,52 @@ def drawUpdateAzure(win):
         win.addstr('\n')
     win.addstr('\n')
 
+def drawDockerUpdate(win):
+    win.clear()
+    win.addstr(0,0,"***********************\n")
+    win.addstr("Docker Images\n")
+    win.addstr("***********************\n\n")
+    win.addstr('\n')
+    win.refresh()
+
+    #AWS
+    instances = ec2.meta.client.describe_instance_status(IncludeAllInstances=False)['InstanceStatuses']
+    ids = [] 
+    for s in instances:
+        ids.append(s['InstanceId'])
+    descriptions = ec2.meta.client.describe_instances(InstanceIds=ids)['Reservations']
+    for d in descriptions:
+        for i in d['Instances']:
+            try:
+                for a in i['NetworkInterfaces']:
+                    ip = a['Association']['PublicIp']
+                    dockerPS = runDockerPsAWS(ip, 'keys/testing6.pem')
+                    win.addstr(ip+'\n')
+                    win.addstr(str(dockerPS)+'\n\n')
+                    win.refresh()
+            except Exception as e:
+                win.addstr(str(e)+'\n')
+                pass
+    #Azure
+
+
+    win.addstr("Press Enter to continue...\n")
+    while 1:          
+        try:                 
+            win.timeout(100)          
+            key = win.getch()  
+            if key == 10:
+                return
+        except:
+            return
+
 def main(win):
     key=""
     msg=""
     win.clear()                
     while 1:          
         try:                 
-            win.timeout(100)          
+            win.timeout(1000)          
             key = win.getch()         
             win.clear()     
 
@@ -399,6 +494,8 @@ def main(win):
                 break           
             elif key == 102:
                 msg = debugFnc()
+            elif key == 100:
+                drawDockerUpdate(win)
             elif key == 99:
                 try:
                     loadInstancesFromFile(win)
