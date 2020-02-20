@@ -20,6 +20,7 @@ from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.models import DiskCreateOption
 from msrestazure.azure_exceptions import CloudError
+import pxssh
 
 DISPLAY_STORAGE = True
 
