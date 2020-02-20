@@ -25,6 +25,9 @@ DISPLAY_STORAGE = True
 
 
 #region [rgba(160,32,240,0.1)] AWS
+#TODO docker
+#https://hackernoon.com/running-docker-on-aws-ec2-83a14b780c56?fbclid=IwAR0rUTEbORAjIquWMWI1DVyVWJ-1cLpWV5WkuBbGQjCT8PGYGhbqRH6cjdU
+
 def attachVolAWS(id, zone, size):
     volume = ec2.create_volume(Size=size, AvailabilityZone=zone)
     time.sleep(30)
@@ -32,15 +35,23 @@ def attachVolAWS(id, zone, size):
 
 def createAWSVM(win, vm, docker):
     win.addstr('\n\nCreating AWS VM: '+vm[2]+'\n')
+    win.refresh()
     #Create ssh key
     try:
+        win.addstr('Creating key: '+vm[7]+'\n')
+        win.refresh()
         key_pair = ec2.create_key_pair(KeyName=vm[7].split(".")[0])
         keyPairOut = str(key_pair.key_material)
         outfile = open('keys/'+vm[7],'w')
         outfile.write(keyPairOut)
     except:
+        win.addstr('Key already exists\n')
+        win.refresh()
         pass
+
     #Create instance 
+    win.addstr('Creating VM instance\n')
+    win.refresh()
     response = ec2.create_instances(BlockDeviceMappings=[
         {
             'DeviceName': '/dev/xvda',
@@ -73,6 +84,9 @@ def rebootAWS():
 #endregion
 
 #region [rgba(100,200,0,0.1)] AZURE
+#Keyvault doc
+#https://docs.microsoft.com/en-us/azure/virtual-machines/linux/key-vault-setup
+
 debian = {
     "offer": "debian-10",
     "publisher": "Debian",
@@ -310,18 +324,30 @@ def drawFooter(win, msg):
 
 def drawUpdateAWS(win):
     instances = ec2.meta.client.describe_instance_status(IncludeAllInstances=True)['InstanceStatuses']
+    win.addstr('\n')
     ids = [] 
     for s in instances:
         ids.append(s['InstanceId'])
     descriptions = ec2.meta.client.describe_instances(InstanceIds=ids)['Reservations']
     desc = {}
+    ip={}
     for d in descriptions:
         for i in d['Instances']:
             desc[i['InstanceId']] = i
+            try:
+                for a in i['NetworkInterfaces']:
+                    ip[i['InstanceId']] = a['Association']['PublicIp']
+            except:
+                ip[i['InstanceId']] = 'None'
+                pass
     for status in instances:
         y, x = win.getyx()
         win.addstr(y, x, status['InstanceId'])
-        win.addstr(y, x+24, status['InstanceState']['Name']+'\n')
+        win.addstr(y, x+24, status['InstanceState']['Name'])
+        ip_str = 'None'
+        if status['InstanceId'] in ip:
+            ip_str = ip[status['InstanceId']]
+        win.addstr(y, x+48, ip_str+'\n')
         if status['InstanceId'] in desc.keys():
             y, x = win.getyx()
             win.addstr(y, x+4, 'System: '+desc[status['InstanceId']]['ImageId']+'\n')
@@ -340,10 +366,10 @@ def drawUpdateAzure(win):
             state = states[1].display_status
         y, x = win.getyx()
         win.addstr(y, x, vm.name)
-        win.addstr(y, x+16, state+'\n')
+        win.addstr(y, x+24, state+'\n')
         try:
             public_ip = network_client.public_ip_addresses.get('cis4010A2', vm.name+'-pub-ip')
-            win.addstr(y, x+36, str(public_ip.ip_address))
+            win.addstr(y, x+48, str(public_ip.ip_address))
         except:
             pass
         win.addstr('\n')
@@ -414,6 +440,7 @@ if __name__ == "__main__":
     compute_client = get_client_from_auth_file(ComputeManagementClient, auth_path='credentials.json')
     global network_client
     network_client = get_client_from_auth_file(NetworkManagementClient, auth_path='credentials.json')
+
     curses.wrapper(main)
 
     '''
@@ -424,12 +451,15 @@ if __name__ == "__main__":
     descriptions = ec2.meta.client.describe_instances(InstanceIds=ids)['Reservations']
     for r in descriptions:
         for i in r['Instances']:
+            #print(i)
+            print(i['NetworkInterfaces'][0]['Association']['PublicIp'])
             print(i['InstanceId'])
             print(i['ImageId'])
             print(i['InstanceType'])
             for block in i['BlockDeviceMappings']:
                 print(ec2.Volume(block['Ebs']))
                 print(ec2.Volume(block['Ebs']['VolumeId']).size)
+
     for r in descriptions:
         for i in r['Instances']:
             print(i['ImageId'])

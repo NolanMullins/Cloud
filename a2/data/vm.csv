@@ -1,2 +1,2 @@
 Platform,Instance,VM Name,VM Size,Storage Y/N,Storage Type,Storage size,sshkey file
-AZURE,redHat,redHatVM-2,Standard_B1ls,Y,standard,24,
+AWS,ami-0a887e401f7654935,docker-vm,t2.micro,Y,gp2,8,testing6.pem
