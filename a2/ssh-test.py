@@ -30,6 +30,8 @@ awsos['ami-0c322300a1dd5dc79'] = 'Red Hat'
 awsos['ami-0df6cfabfbe4385b7'] = 'SUSE Linux'
 awsos['ami-07ebfd5b3428b6f4d'] = 'Ubuntu Server'
 
+AZURE_PUB_KEY = 'newKey.pub'
+AZURE_KEY = 'newKey'
 '''
 sudo yum update -y
 sudo yum install -y docker
@@ -55,36 +57,21 @@ def readFiles():
             docker.append(row)
     return vms, docker
 
-def installDockerAzure(ip, key):
-    s = pxssh.pxssh()
-    if not s.login (server=ip, username='adminL0gin', ssh_key='keys/testing6.pem'):
-        return "SSH session failed on login."+str(s)
-    else:
-        s.sendline('sudo yum update -y')
-        s.prompt()
-        s.sendline('sudo yum install -y docker')
-        s.prompt()
-        s.sendline('sudo service docker start')
-        s.prompt()
-        s.sendline('sudo docker run -d -p 80:80 --name nginx nginx')
-        s.prompt()
-        s.logout()
-        return 'success' 
 
-def buildDockerScript(id, os, docker):
+def buildDockerScript(id, os, docker, flag):
     cmd = 'apt'
     if os == 'Amazon Linux':
         cmd = 'yum'
     script = "#!/bin/bash\n"
     script = script + 'sudo '+cmd+' update -y \n'
-    script = script + 'sudo '+cmd+' update -y \n'
+    if (flag):
+        script = script + 'curl -sSL https://get.docker.com/ | sh \n'
     script = script + 'sudo '+cmd+' install -y docker \n'
     script = script + 'sudo service docker start \n'
     for image in docker:
         if image[0] == id:
             script = script + 'sudo docker run '+image[1]+' \n'
     return script
-
 
 #Only use yum if using amazon linux
 def installDockerAWS(ip, key):
@@ -127,7 +114,39 @@ def runDockerPsAWS(ip, key):
     host = host + '.compute-1.amazonaws.com'
     user = 'ec2-user'
     return runDockerPs(host, user, key)
-        
+
+def installDockerAzure(id, ip, key):
+    s = pxssh.pxssh()
+    vms, docker = readFiles()
+    if not s.login (server=ip, username='adminL0gin', ssh_key=key):
+        return "SSH session failed on login."+str(s)
+    else:
+        script = buildDockerScript(id, 'azure', docker, True)
+        s.sendline("echo '"+script+"' > script.sh")
+        s.prompt()
+        s.sendline('sudo chmod +x script.sh')
+        s.prompt()
+        s.sendline('sudo nohup ./script.sh > result.log &')
+        s.prompt()
+        s.logout()
+        '''
+        s.sendline('sudo apt update -y')
+        s.prompt()
+        s.sendline('curl -sSL https://get.docker.com/ | sh')
+        s.prompt()
+        s.sendline('sudo apt install -y docker')
+        s.prompt()
+        s.sendline('sudo service docker start')
+        s.prompt()
+        for image in docker:
+            if image[0] == id:
+                print('running: '+image[1])
+                s.sendline('sudo docker run '+image[1])
+                s.prompt()
+        s.logout()
+        '''
+        return 'success'
+
 def runDockerPsAzure(ip, key):
     return runDockerPs(ip, 'adminL0gin', key)
 
@@ -136,8 +155,15 @@ def runDockerPsAzure(ip, key):
 if __name__ == "__main__":
     #print(installDockerAWS('54.89.226.82', 'keys/testting6.pem'))
 
+
     vms, docker = readFiles()
-    result = runDockerPsAWS('18.207.209.164', 'keys/testing6.pem')
-    print(str(result))
+    print(buildDockerScript('debianVM', 'os', docker, True))
+    cmd = 'az vm run-command invoke -g cis4010A2 -n otherVM --command-id RunShellScript --scripts \'sudo apt update -y && curl -sSL https://get.docker.com/ | sh && sudo apt install -y docker && sudo service docker start && sudo docker run mongo\''
+    os.system(cmd)
+    #result = runDockerPsAWS('18.207.209.164', 'keys/testing6.pem')
+    #print(buildDockerScript('debian', 'azure', docker, True))
+    #installDockerAzure('ubuntuVM', '52.170.86.56', 'keys/azureKey')
+    #result = runDockerPsAzure('40.117.35.47', 'keys/azureKey')
+    #print(str(result).replace('\\r','').replace('\\n', '\n'))
     #print(buildDockerScript('awsDockerVM', 'Amazon Linux', docker))
     #if not s.login (server='localhost', username='myusername', password='mypassword'):

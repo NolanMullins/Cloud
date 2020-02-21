@@ -1,2 +1,6 @@
 Instance,Docker image,Registery,Background Y/N
 awsDockerVM,mongo,library,Y
+debianVM,mongo,library,Y
+debianVM2,mongo,library,Y
+ubuntuVM,mongo,library,Y
+ubuntuVM2,mongo,library,Y
