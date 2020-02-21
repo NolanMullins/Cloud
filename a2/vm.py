@@ -26,8 +26,8 @@ from multiprocessing import Process
 
 DISPLAY_STORAGE = True
 AWS_KEY = 'keys/testing6.pem'
-AZURE_PUB_KEY = 'keys/azureKey.pub'
-AZURE_KEY = 'keys/azureKey'
+AZURE_PUB_KEY = 'newKey.pub'
+AZURE_KEY = 'newKey'
 
 awsos = {}
 awsos['ami-0a887e401f7654935'] = 'Amazon Linux'
@@ -337,7 +337,7 @@ def installDockerAzure(id, ip, key):
         s.prompt()
         s.sendline('sudo chmod +x script.sh')
         s.prompt()
-        s.sendline('sudo nohup ./script.sh &')
+        s.sendline('sudo nohup ./script.sh > result.log &')
         s.prompt()
         s.logout()
         return 'success'

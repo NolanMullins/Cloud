@@ -1,20 +1,19 @@
 *****************************
 Nolan Mullins
 0939720
-Cloud A1
+Cloud A2
 *****************************
 
 Required packages:
 boto3
 azure
-azure-storage
-azure-cosmos
+pexpect
 
 AWS requires credentials stored in:
     ~/.aws/credentials
 
 Azure requires environment variable to be set:
-    AZURE_STORAGE_CONNECTION_STRING
+    credentials.json
 
 *****************************
 Setup
@@ -25,60 +24,18 @@ make init
 *****************************
 Running
 *****************************
-./1_aws.py
-./1_azure.py
-./2_aws.py
-./2_azure.py
+sudo ./vm.py
 
-
-*****************************
-Task 1
-*****************************
-
-Enter 'q' to quit
-
-    1: All containers
-
-    2 <container>: A specified container
-
-    3 <file>: Look for file
-
-    4 <file>: Download a file
-
-Examples:
-2 cis1300nolan
-3 lecture2
-
-*****************************
-Task 2
-*****************************
-
-Query structure
-<term> <operator> <value>
-Available operators:
-<
->
-=
-between <value> <value>
-
-Examples:
-year = 1951
-year between 1920 1980
-info.rating > 8
-
+c create VMs
+d to view docker
+r to reboot
+t to terminate
+q to quit
 
 *****************************
 Limitations
 *****************************
 
-Some items don't contain all parameters and this causes issues. 
-For example:
-Filter:
-    year = 2015
-
-Sort:
-    info.rating
-
-This will fail since it tries to sort all items and when one doesn't
-have a rating it causes the sort to fail. It will also cause issues 
-when trying to display the rating.
+1: Docker deployment may not work on redHat as it requires the enterprise edition
+2: AWS vm names are not stored on the VM 
+3: Can't run for too long or data requests will stall out

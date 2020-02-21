@@ -1,3 +1,3 @@
 Platform,Instance,VM Name,VM Size,Storage Y/N,Storage Type,Storage size,sshkey file
-AWS,ami-0a887e401f7654935,test-py-vm,t2.micro,Y,gp2,8,testing2.pem
-AWS,ami-0a887e401f7654935,test-py-vm-2,t2.micro,Y,gp2,8,testing3.pem
+AWS,ami-0a887e401f7654935,test-py-vm,t2.micro,Y,gp2,8,testing6.pem
+AWS,ami-0a887e401f7654935,test-py-vm-2,t2.micro,Y,gp2,8,testing6.pem
