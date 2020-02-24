@@ -150,6 +150,15 @@ def installDockerAzure(id, ip, key):
 def runDockerPsAzure(ip, key):
     return runDockerPs(ip, 'adminL0gin', key)
 
+def buildAZCMD(vmName, docker):
+    cmd = 'az vm run-command invoke -g cis4010A2 -n '+vmName+' --command-id RunShellScript --scripts '
+    cmd = cmd+'\'sudo apt update -y && curl -sSL https://get.docker.com/ | sh && sudo apt install -y docker && sudo service docker start'
+    for image in docker:
+        if image[0] == id:
+            cmd = cmd+' && sudo docker run '+image[1]
+    cmd = cmd+'\''
+    return cmd
+
 #sudo ssh -i keys/testing6.pem ec2-user@ec2-54-89-226-82.compute-1.amazonaws.com
 #sudo ssh -i keys/testing6.pem ec2-user@ec2-3-93-246-73.compute-1.amazonaws.com
 if __name__ == "__main__":
@@ -157,9 +166,18 @@ if __name__ == "__main__":
 
 
     vms, docker = readFiles()
-    print(buildDockerScript('debianVM', 'os', docker, True))
-    cmd = 'az vm run-command invoke -g cis4010A2 -n otherVM --command-id RunShellScript --scripts \'sudo apt update -y && curl -sSL https://get.docker.com/ | sh && sudo apt install -y docker && sudo service docker start && sudo docker run mongo\''
-    os.system(cmd)
+    #print(buildDockerScript('debianVM', 'os', docker, True))
+    #print(buildAZCMD('debianVM', docker))
+    vms, docker = readFiles()
+    for vm in vms:
+        if (vm[0]=='AZURE'):
+            try:
+                cmd = buildAZCMD('otherVM', docker)
+                os.system(cmd)
+            except Exception as e:
+                pass
+                
+    #cmd = 'az vm run-command invoke -g cis4010A2 -n otherVM --command-id RunShellScript --scripts \'sudo apt update -y && curl -sSL https://get.docker.com/ | sh && sudo apt install -y docker && sudo service docker start && sudo docker run mongo\''
     #result = runDockerPsAWS('18.207.209.164', 'keys/testing6.pem')
     #print(buildDockerScript('debian', 'azure', docker, True))
     #installDockerAzure('ubuntuVM', '52.170.86.56', 'keys/azureKey')

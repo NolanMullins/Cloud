@@ -54,7 +54,7 @@ def buildDockerScript(id, os, docker, flag):
 
 def runDockerPs(host, user, key):
     result = ''
-    s = pxssh.pxssh()
+    s = pxssh.pxssh(options='{StrictHostKeyChecking=no}')
     if not s.login (server=host, username=user, ssh_key=key):
         return "SSH session failed on login."+str(s)
     else:
@@ -326,9 +326,11 @@ def createAzureVM(win, vm, docker):
     #async_disk_attach.wait()
     dockerDeployments.append(vm[2])
 
-def installDockerAzure(id, ip, key):
-    s = pxssh.pxssh()
+def installDockerAzure(vmName):
     vms, docker = readFiles()
+    os.system(buildAZCMD(vmName, docker))
+    '''
+    s = pxssh.pxssh()
     if not s.login (server=ip, username='adminL0gin', ssh_key=key):
         return "SSH session failed on login."+str(s)
     else:
@@ -341,6 +343,17 @@ def installDockerAzure(id, ip, key):
         s.prompt()
         s.logout()
         return 'success'
+    '''
+
+def buildAZCMD(vmName, docker):
+    cmd = 'az vm run-command invoke -g cis4010A2 -n '+vmName+' --command-id RunShellScript --scripts '
+    cmd = cmd+'\'sudo apt update -y && curl -sSL https://get.docker.com/ | sh && sudo apt install -y docker && sudo service docker start'
+    for image in docker:
+        if image[0] == id:
+            cmd = cmd+' && sudo docker run '+image[1]
+    cmd = cmd+'\''
+    return cmd
+
 
 def killAzure():
     for vm in compute_client.virtual_machines.list_all():
@@ -453,7 +466,7 @@ def drawUpdateAzure(win):
                     try:
                         win.addstr('Installing docker images on: '+vm.name+'\n')
                         public_ip = network_client.public_ip_addresses.get('cis4010A2', vm.name+'-pub-ip').ip_address
-                        p =  Process(target=installDockerAzure, args=(vm.name, public_ip, AZURE_KEY))
+                        p =  Process(target=installDockerAzure, args=(vm.name))
                         p.start()
                         procs.append(p)
                         dockerDeployments.remove(vm.name)

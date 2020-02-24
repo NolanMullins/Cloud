@@ -8,6 +8,7 @@ import os
 import curses
 import datetime
 import traceback
+import sys
 
 import azure
 from azure.common.client_factory import get_client_from_auth_file
@@ -57,8 +58,8 @@ images['debian'] = debian
 images['redHat'] = redHat
 images['ubuntu'] = ubuntu
 
-AZURE_PUB_KEY = 'newKey.pub'
-AZURE_KEY = 'newKey'
+AZURE_PUB_KEY = 'tmpKey.pub'
+AZURE_KEY = 'tmpKey'
 
 def readFiles():
     vms = []
@@ -133,6 +134,7 @@ def create_nic(resourceGroup, uid):
     )
     return async_nic_creation.result()
 
+import codecs
 def create_vm_parameters(nic_id, vm):
     keyFile = open(AZURE_PUB_KEY,'r')
     return {
@@ -152,14 +154,14 @@ def create_vm_parameters(nic_id, vm):
             },
         },
         'hardware_profile': {
-            'vm_size': vm[3]
+            'vm_size': str(vm[3])
         },
         'storage_profile': {
             'image_reference': images[vm[1]]
         },
         'network_profile': {
             'network_interfaces': [{
-                'id': nic_id,
+                'id': str(nic_id),
             }]
         },
     }
@@ -179,7 +181,10 @@ def createAzureVM(vm, docker):
     # Create Linux VM
     vm_parameters = create_vm_parameters(id, vm)
     print('creating machine')
-    async_vm_creation = compute_client.virtual_machines.create_or_update('cis4010A2', vm[2], vm_parameters)
+    try: 
+        async_vm_creation = compute_client.virtual_machines.create_or_update('cis4010A2', vm[2], vm_parameters)
+    except Exception as e:
+        print(e)
     print('done')
     #async_vm_creation.wait()
 
@@ -245,14 +250,15 @@ if __name__ == "__main__":
     print(public_ip.result())
     exit(0)
     '''
-
     vms, docker = readFiles()
     for vm in vms:
         if (vm[0]=='AZURE'):
             try:
-                createAzureVM(vm, docker)
-            except CloudError as e:
-                print(e)
+                response = createAzureVM(vm, docker)
+            except Exception as e:
+                print(str(e))
+                #print("Error creating the availability set: {0}".format(str(e)))
+                #print(str(response))
 
     exit(0)
     #az vm list-ip-addresses -o table
